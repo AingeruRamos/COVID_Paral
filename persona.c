@@ -56,33 +56,7 @@ void PrintPersona(Persona* persona) {
     printf("VEL: M %d, UX %f, UY %f\n", persona->vel.modulo, persona->vel.ux, persona->vel.uy);
 }
 
-/*
-void calcular_edad(ListaEnlazadaRef lista,int n){
-    int semilla, edad,i;
-    float mu;
-    tipoNodoRef nodo = *lista;
-    Persona *persona;
-    gsl_rng *r;
 
-    mu=N_PERSONAS;
-    semilla=1;
-
-    gsl_rng_env_setup();
-    r = gsl_rng_alloc(gsl_rng_default);
-    gsl_rng_set(r, semilla);
-
-    for (i=0 ; i< n; i++){
-        persona = (Persona*) &nodo->info;
-        edad = round(mu * gsl_ran_beta(r, ALFA, BETA));
-        persona->edad = edad;
-        persona->p_muerte = calcular_p_morir(edad);
-        printf("%d edad %f p_muerte\n",edad, persona->p_muerte);
-        nodo = nodo->sig;
-    }
-
-    gsl_rng_free(r);
-}
-*/
 float calcular_p_morir(int edad){
   float prob;
 
