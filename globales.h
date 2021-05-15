@@ -29,9 +29,11 @@ int N_SANOS;
 int N_CONTAGIADOS;
 int N_RECUPERADOS;
 int N_FALLECIDOS;
+int N_PERSONAS_P; //n personas de cada nodo
 int N_PERSONAS_VACU;
+int N_PERSONAS_VACU_P;
 int N_PERSONAS_VACU_T; //personas a vacunar por unidad de tiempo
-
+int NODO_CONTAGIADO; //nodo que tiene el paciente contagiado cero
 //METRICAS
 float M_SANOS;
 float M_CONTAGIADOS;

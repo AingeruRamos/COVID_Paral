@@ -521,7 +521,7 @@ insertarOrdenada(ListaEnlazadaRef raiz, tipoInfoRef info)
 	}
 }
 */
-/*
+
 int
 mostrarListaEnlazada(ListaEnlazada raiz)
 {
@@ -535,11 +535,11 @@ mostrarListaEnlazada(ListaEnlazada raiz)
 
 	aImprimir = raiz;
 	while (aImprimir != NULL) {
-		printf("\t%3d)\t%7d\n",i++, aImprimir->info);
+		printf("\t%3d)\t%7d\n",i++, aImprimir->info.id);
 		aImprimir = aImprimir->sig;
 	}
 	return res;
-}*/
+}
 
 
 /*
