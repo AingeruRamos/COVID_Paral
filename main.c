@@ -71,14 +71,15 @@ int main(int argc, char** argv) {
         //Movimiento
         AplicarMovimiento(sanos);
         AplicarMovimiento(contagiados);
-/*
+
         if(TIEMPO_BATCH == 0 || (tiempo % TIEMPO_BATCH) == 0) {
             if (tiempo == (TIEMPO_SIMULACION - 1)){
                 flag = 1;
+                MPI_Barrier(MPI_COMM_WORLD);
             }
-            GuardarDatos(n_metrica,flag);
+            GuardarDatos(n_metrica,flag,world_rank,world_size);
             n_metrica++;
-        }*/
+        }
     }
 
     liberarListaEnlazada(sanos);
@@ -199,6 +200,7 @@ void calcular_edad(ListaEnlazadaRef lista,int n,gsl_rng *r, int world_rank){
         edad = round(mu * gsl_ran_beta(r, ALFA, BETA));
         persona->edad = edad;
         persona->p_muerte = calcular_p_morir(edad);
+     //   printf("Persona %d del nodo %d \n",persona->id, world_rank);
         nodo = nodo->sig;
     }
 

@@ -2,41 +2,47 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <string.h>
+#include <mpi.h>
 
 #include "../globales.h"
 #include "../listaEnlazadaSimple.h"
 
-void GuardarPosiciones(char* nombre) {
-    char* nombreFichero = (char*) malloc(sizeof(char)*200);
+void GuardarPosiciones(char* nombre,int world_rank) {
+    MPI_File fh;
+    MPI_Offset offset;
+    MPI_Datatype arraytype;
+    char *nombreFichero = (char*) malloc(sizeof(char)*200);
+    char *buf = (char*) malloc(sizeof(char)*200);
     strcpy(nombreFichero, nombre);
     strcat(nombreFichero, ".pos");
 
-    FILE* fp = fopen(nombreFichero, "w");
+    offset = world_rank*strlen("ID:   ; Posicion(X:   , Y:   ); Estado:  \n")*(N_PERSONAS_P-1); //ESTA MAL, TIENE QUE SER CON LAS CADENAS
+    MPI_Type_contiguous(N_PERSONAS_P, MPI_CHAR, &arraytype);
+    MPI_Type_commit(&arraytype);
+
+    MPI_File_open(MPI_COMM_WORLD, nombreFichero,MPI_MODE_CREATE | MPI_MODE_RDWR, MPI_INFO_NULL, &fh);
+    MPI_File_set_view(fh, offset,MPI_CHAR, arraytype,"native", MPI_INFO_NULL);
 
     tipoNodoRef nodo_aux = *sanos;
     struct Persona* persona;;
     while(nodo_aux != NULL) {
         persona = (struct Persona*) &nodo_aux->info;
-        fprintf(fp, "ID: %d; ", persona->id);
-        fprintf(fp, "Posicion(X: %d, Y: %d); ", persona->pos.x, persona->pos.y);
-        fprintf(fp, "Estado: %d", persona->estado);
-        fputs("\n", fp);
+        sprintf(buf,"ID: %d; Posicion(X: %d, Y: %d); Estado: %d\n", persona->id,persona->pos.x, persona->pos.y,persona->estado);
+        MPI_File_write(fh, buf, strlen(buf),MPI_CHAR, MPI_STATUS_IGNORE);
         nodo_aux = nodo_aux->sig;
     }
-
-    fprintf(fp, "\n");
 
     nodo_aux = *contagiados;
     while(nodo_aux != NULL) {
         persona = (struct Persona*) &nodo_aux->info;
-        fprintf(fp, "ID: %d; ", persona->id);
-        fprintf(fp, "Posicion(X: %d, Y: %d); ", persona->pos.x, persona->pos.y);
-        fprintf(fp, "Estado: %d", persona->estado);
-        fputs("\n", fp);
+        sprintf(buf,"ID: %d; Posicion(X: %d, Y: %d); Estado: %d\n", persona->id,persona->pos.x, persona->pos.y,persona->estado);
+        MPI_File_write(fh, buf, strlen(buf),MPI_CHAR, MPI_STATUS_IGNORE);
         nodo_aux = nodo_aux->sig;
     }
 
-    fclose(fp);
+    MPI_File_close(&fh);
+    free(buf);
     free(nombreFichero);
 
     /*
@@ -87,18 +93,47 @@ void GuardarMetricas(char* nombre) {
     */
 }
 
-void GuardarDatos(int id_metricas, int flag) {
+void GuardarDatos(int id_metricas, int flag,int world_rank, int world_size) {
     char* ruta = (char*) malloc(sizeof(char)*200);
-    sprintf(ruta, "datos/%d_%d_%d_%d_%.2f_%.2f_%.2f/", N_PERSONAS, MAX_X, MAX_Y, TIEMPO_SIMULACION, ALFA, BETA, PORCENT_VACUNACION);
-    mkdir(ruta, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    sprintf(ruta, "datos/%d_%d_%d_%d_%d_%d_%d/", N_PERSONAS, MAX_X, MAX_Y, TIEMPO_SIMULACION, ALFA, BETA, PORCENT_VACUNACION);
+
+    if (world_rank == 0){
+        mkdir(ruta, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    }
 
     sprintf(ruta, "%s%d", ruta, id_metricas);
 
-    GuardarPosiciones(ruta);
-    GuardarPosiciones(ruta);
+    GuardarPosiciones(ruta,world_rank);
 
     if (flag == 1){
-        GuardarMetricas(ruta);
+
+        if (world_rank == 0)
+            MPI_Reduce(MPI_IN_PLACE,&N_SANOS,1,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD);
+        else
+            MPI_Reduce(&N_SANOS,&N_SANOS,1,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD);
+
+        if (world_rank == 0)
+            MPI_Reduce(MPI_IN_PLACE,&N_CONTAGIADOS,1,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD);
+        else
+            MPI_Reduce(&N_CONTAGIADOS,&N_CONTAGIADOS,1,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD);
+
+        if (world_rank == 0)
+            MPI_Reduce(MPI_IN_PLACE,&N_RECUPERADOS,1,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD);
+        else
+            MPI_Reduce(&N_RECUPERADOS,&N_RECUPERADOS,1,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD);
+
+        if (world_rank == 0)
+            MPI_Reduce(MPI_IN_PLACE,&N_FALLECIDOS,1,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD);
+        else
+            MPI_Reduce(&N_FALLECIDOS,&N_FALLECIDOS,1,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD);
+
+        if (world_rank == 0)
+            MPI_Reduce(MPI_IN_PLACE,&R0,1,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD);
+        else
+            MPI_Reduce(&R0,&R0,1,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD);
+
+        if(world_rank == 0)
+           GuardarMetricas(ruta);
     }
 
     free(ruta);

@@ -3,6 +3,6 @@
 
 void GuardarPosiciones(char *ruta);
 void GuardarMetricas(char *ruta);
-void GuardarDatos(int n_metricas,int flag);
+void GuardarDatos(int n_metricas,int flag,int world_rank, int world_size);
 
 #endif
