@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
     r = gsl_rng_alloc(gsl_rng_default);
     gsl_rng_set(r, semilla);
 
-    MPI_Init(&argc,&argv);
+    MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
@@ -64,20 +64,20 @@ int main(int argc, char** argv) {
     for(tiempo=0; tiempo<TIEMPO_SIMULACION; tiempo++) {
 //        TIME = tiempo;
         //Actualizar Estados
-        EstadosPersonas(contagiados,sanos);
-        VacunarPersonas(sanos);
+//        EstadosPersonas(contagiados,sanos);
+//        VacunarPersonas(sanos);
         //Propagación
-//	AplicarPropagacion();
+	AplicarPropagacion(world_size, world_rank);
         //Movimiento
-        AplicarMovimiento(sanos);
-        AplicarMovimiento(contagiados);
+//        AplicarMovimiento(sanos);
+//        AplicarMovimiento(contagiados);
 
         if(TIEMPO_BATCH == 0 || (tiempo % TIEMPO_BATCH) == 0) {
             if (tiempo == (TIEMPO_SIMULACION - 1)){
                 flag = 1;
                 MPI_Barrier(MPI_COMM_WORLD);
             }
-            GuardarDatos(n_metrica,flag,world_rank,world_size);
+//            GuardarDatos(n_metrica,flag,world_rank,world_size);
             n_metrica++;
         }
     }
