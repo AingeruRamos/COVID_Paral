@@ -9,6 +9,8 @@
 #include "../persona.h"
 #include "../listaEnlazadaSimple.h"
 
+#define MAX_TAM_PQT 4
+
 float DistanciaEntrePersonas(struct Persona* p1, struct Persona* p2) {
     int dx;
     if(p1->pos.x > p2->pos.x) { dx = p1->pos.x-p2->pos.x; }
@@ -33,18 +35,19 @@ int HayContagio(struct Persona* p1, struct Persona* p2) {
     return 0;
 }
 
-int CrearPaquete(Posicion* pqt, tipoNodoRef pqt_ini) {
+int CrearPaquete(int* pqt, tipoNodoRef pqt_ini) {
     int tam_pqt = 0;
     tipoNodoRef pqt_fin = pqt_ini;
 
+    int i=0;
     while(pqt_fin != NULL && tam_pqt < 4) {
-	pqt[tam_pqt] = pqt_fin->info.pos;
+	pqt[i*tam_pqt] = pqt_fin->info.pos.x;
+	pqt[(i*tam_pqt)+1] = pqt_fin->info.pos.y;
 	tam_pqt++;
 	pqt_fin = pqt_fin->sig;
     }
 
     tam_pqt++;
-    pqt_ini = pqt_fin;
     return tam_pqt;
 }
 
@@ -95,10 +98,12 @@ void AplicarPropagacion(int world_size, int world_rank) {
     int i, j, k;
 
     int tam_pqt;
-    Posicion pos_array[4];
+    int pos_array[2*MAX_TAM_PQT];
 
     int i_indice;
-    int indice_array[4];
+    int indice_array[MAX_TAM_PQT];
+
+    int tam_res;
 
     Persona p_aux;
 
@@ -107,14 +112,16 @@ void AplicarPropagacion(int world_size, int world_rank) {
  	    nodo_sanos = *sanos;
 	    while(nodo_sanos != NULL) {
 		tam_pqt = CrearPaquete(pos_array, nodo_sanos);
-	        //Enviar el tamaño del paquete por Bcast
+	        MPI_Bcast(&tam_pqt, 1, MPI_INT, i, MPI_COMM_WORLD);//Enviar el tamaño del paquete por Bcast
 	        if(tam_pqt > 0) {
 		    //Enviar pos_array por Bcast
+		    MPI_Bcast(pos_array, 2*tam_pqt, MPI_INT, i, MPI_COMM_WORLD);
 	            for(j=0; j<world_size; j++) {
 		        if(j != i) {
 			    //Recibir tamaño de la respuesta
+			    MPI_Recv(&tam_res, 1, MPI_INT, j, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 			    //Cargar la informacon recibida en un array buffer
-
+			    MPI_Recv(&indice_array, tam_res, MPI_INT, j, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 			    i_indice = 0;
 			    for(k=0; k<tam_pqt; k++) { //Ver contagios en el paquete y gestionar
 				persona_sana = &nodo_sanos->info;
@@ -139,25 +146,27 @@ void AplicarPropagacion(int world_size, int world_rank) {
 	    }
 	} else {
 	    //Recibir el tamaño del paquete por Bcast
+	    MPI_Bcast(&tam_pqt, 1, MPI_INT, i, MPI_COMM_WORLD);
 	    while(tam_pqt > 0) {
 	    	//Cargar la informacion recbida en un array buffer
-
+		MPI_Bcast(pos_array, 2*tam_pqt, MPI_INT, i, MPI_COMM_WORLD);
 		i_indice = 0;
-		for(i=0; i<tam_pqt; i++) { //Calcular contagios en el paquete
-		    p_aux.pos = pos_array[i];
+		for(j=0; j<2*tam_pqt; j+=2) { //Calcular contagios en el paquete
+		    p_aux.pos.x = pos_array[j];
+		    p_aux.pos.y = pos_array[j+1];
 		    nodo_contagiados = *contagiados;
 		    while(nodo_contagiados != NULL) {
 			persona_contagiada = &nodo_contagiados->info;
 		        if(HayContagio(&p_aux, persona_contagiada)) {
-			    indice_array[i_indice] = i;
+			    indice_array[i_indice] = j/2;
 			    i_indice++;
 			    break;
 			}
 			nodo_contagiados = nodo_contagiados->sig;
                     }
 		}
-		//Enviar numero que se han contagiado
-	    	//Enviar los indices de los contagiados
+		MPI_Send(&i_indice, 1, MPI_INT, i, 0, MPI_COMM_WORLD); //Enviar numero de contag
+	    	MPI_Send(indice_array, i_indice, MPI_INT, i, 0, MPI_COMM_WORLD); //Enviar los indices de los contagiados
 	    }
 	}
     }
