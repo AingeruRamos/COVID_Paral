@@ -80,6 +80,9 @@ void AplicarPropagacion(int world_size, int world_rank) {
 
                 eliminarNodo(sanos, nodo_sanos);
 		insertarNodoComienzo(contagios_nuevos, persona_copia);
+		N_SANOS--;
+		N_CONTAGIADOS++;
+		R0++;
             }
             nodo_contagiados = nodo_contagiados->sig;
         }
@@ -108,7 +111,7 @@ void AplicarPropagacion(int world_size, int world_rank) {
     Persona p_aux;
 
     for(i=0; i<world_size; i++) {
-	if(world_rank == i) {
+	if(world_rank == i) { //Nodo director
  	    nodo_sanos = *sanos;
 	    while(nodo_sanos != NULL) {
 		tam_pqt = CrearPaquete(pos_array, nodo_sanos);
@@ -136,6 +139,9 @@ void AplicarPropagacion(int world_size, int world_rank) {
 
 				    nodo_sanos = nodo_aux;
 				    i_indice++;
+
+				    N_SANOS--;
+				    N_CONTAGIADOS++;
 				} else {
 				    nodo_sanos = nodo_sanos->sig;
 			    	}
@@ -144,7 +150,7 @@ void AplicarPropagacion(int world_size, int world_rank) {
 		    }
 	        }
 	    }
-	} else {
+	} else { //Nodos esclavos
 	    //Recibir el tamaño del paquete por Bcast
 	    MPI_Bcast(&tam_pqt, 1, MPI_INT, i, MPI_COMM_WORLD);
 	    while(tam_pqt > 0) {
@@ -160,6 +166,7 @@ void AplicarPropagacion(int world_size, int world_rank) {
 		        if(HayContagio(&p_aux, persona_contagiada)) {
 			    indice_array[i_indice] = j/2;
 			    i_indice++;
+			    R0++;
 			    break;
 			}
 			nodo_contagiados = nodo_contagiados->sig;
