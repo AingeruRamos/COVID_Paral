@@ -46,9 +46,14 @@ int CrearPaquete(int* pqt, tipoNodoRef pqt_ini) {
 	tam_pqt++;
 	pqt_fin = pqt_fin->sig;
     }
-
-    tam_pqt++;
     return tam_pqt;
+}
+
+void InicializarArrayCeros(int* array, int length) {
+    int i;
+    for(i=0; i<length; i++) {
+	array[i] = 0;
+    }
 }
 
 void AplicarPropagacion(int world_size, int world_rank) {
@@ -100,6 +105,8 @@ void AplicarPropagacion(int world_size, int world_rank) {
 
     int i, j, k;
 
+    int n_sanos;
+
     int tam_pqt;
     int pos_array[2*MAX_TAM_PQT];
 
@@ -107,49 +114,56 @@ void AplicarPropagacion(int world_size, int world_rank) {
     int indice_array[MAX_TAM_PQT];
 
     int tam_res;
+    int conta_array[MAX_TAM_PQT];
 
     Persona p_aux;
 
     for(i=0; i<world_size; i++) {
 	if(world_rank == i) { //Nodo director
  	    nodo_sanos = *sanos;
-	    while(nodo_sanos != NULL) {
+	    n_sanos = mostrarNumeroNodos(sanos);
+	    while(n_sanos > 0) {
 		tam_pqt = CrearPaquete(pos_array, nodo_sanos);
-	        MPI_Bcast(&tam_pqt, 1, MPI_INT, i, MPI_COMM_WORLD);//Enviar el tamaño del paquete por Bcast
+		n_sanos -= tam_pqt;
+		MPI_Bcast(&tam_pqt, 1, MPI_INT, i, MPI_COMM_WORLD);//Enviar el tamaño del paquete por Bcast
 	        if(tam_pqt > 0) {
 		    //Enviar pos_array por Bcast
 		    MPI_Bcast(pos_array, 2*tam_pqt, MPI_INT, i, MPI_COMM_WORLD);
+		    InicializarArrayCeros(conta_array, MAX_TAM_PQT);
 	            for(j=0; j<world_size; j++) {
 		        if(j != i) {
 			    //Recibir tamaño de la respuesta
 			    MPI_Recv(&tam_res, 1, MPI_INT, j, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 			    //Cargar la informacon recibida en un array buffer
 			    MPI_Recv(&indice_array, tam_res, MPI_INT, j, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-			    i_indice = 0;
-			    for(k=0; k<tam_pqt; k++) { //Ver contagios en el paquete y gestionar
-				persona_sana = &nodo_sanos->info;
-				if(indice_array[i_indice] == k) {
-				    nodo_aux = nodo_sanos->sig;
-
-				    persona_copia = CopiarPersona(persona_sana);
-				    persona_copia->estado = 1;
-
-				    eliminarNodo(sanos, nodo_sanos);
-				    insertarNodoComienzo(contagios_nuevos, persona_copia);
-
-				    nodo_sanos = nodo_aux;
-				    i_indice++;
-
-				    N_SANOS--;
-				    N_CONTAGIADOS++;
-				} else {
-				    nodo_sanos = nodo_sanos->sig;
-			    	}
+			    for(k=0; k<tam_res; k++) {
+				conta_array[indice_array[k]] = 1;
 			    }
 			}
 		    }
-	        }
+		    for(k=0; k<tam_pqt; k++) { //Ver contagios en el paquete y gestionar
+			persona_sana = &nodo_sanos->info;
+			if(conta_array[k] == 1) {
+			    if(nodo_sanos->sig != NULL) { nodo_aux = nodo_sanos->sig; }
+
+			    persona_copia = CopiarPersona(persona_sana);
+			    persona_copia->estado = 1;
+
+			    eliminarNodo(sanos, nodo_sanos);
+			    insertarNodoComienzo(contagios_nuevos, persona_copia);
+
+			    nodo_sanos = nodo_aux;
+
+			    N_SANOS--;
+			    N_CONTAGIADOS++;
+			} else {
+			    if(nodo_sanos->sig != NULL) { nodo_sanos = nodo_sanos->sig; }
+		    	}
+		    }
+		}
 	    }
+	    tam_pqt = 0;
+	    MPI_Bcast(&tam_pqt, 1, MPI_INT, i, MPI_COMM_WORLD);
 	} else { //Nodos esclavos
 	    //Recibir el tamaño del paquete por Bcast
 	    MPI_Bcast(&tam_pqt, 1, MPI_INT, i, MPI_COMM_WORLD);
@@ -173,7 +187,9 @@ void AplicarPropagacion(int world_size, int world_rank) {
                     }
 		}
 		MPI_Send(&i_indice, 1, MPI_INT, i, 0, MPI_COMM_WORLD); //Enviar numero de contag
-	    	MPI_Send(indice_array, i_indice, MPI_INT, i, 0, MPI_COMM_WORLD); //Enviar los indices de los contagiados
+	    	MPI_Send(indice_array, i_indice, MPI_INT, i, 0, MPI_COMM_WORLD); //Enviar los indices de los contagiados*/
+
+		MPI_Bcast(&tam_pqt, 1, MPI_INT, i, MPI_COMM_WORLD);
 	    }
 	}
     }
