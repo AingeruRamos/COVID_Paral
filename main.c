@@ -77,15 +77,7 @@ int main(int argc, char** argv) {
                 flag = 1;
                 MPI_Barrier(MPI_COMM_WORLD);
             }
-<<<<<<< HEAD
-            GuardarDatos(n_metrica,flag,world_rank,world_size);
-=======
-<<<<<<< HEAD
             GuardarDatos(n_metrica,flag,resto,world_rank,world_size);
-=======
-//            GuardarDatos(n_metrica,flag,world_rank,world_size);
->>>>>>> 5f5d9213b210ee70aebf0bf656933227a7355549
->>>>>>> 4ed35d5aa838db47d9141ade310d8537decb7c0d
             n_metrica++;
         }
     }
