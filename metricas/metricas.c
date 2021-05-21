@@ -13,28 +13,22 @@ void GuardarPosiciones(char* nombre,int world_rank,int resto) {
     MPI_Offset offset;
     MPI_Datatype arraytype;
     char *nombreFichero = (char*) malloc(sizeof(char)*200);
-    char *buf[N_PERSONAS_P];
-    char *buffer;
-    int i=0;
-
+    char *buffer = (char*) malloc(sizeof(char)*200);
+    char *buf = (char*) malloc(sizeof(char)*200);
     strcpy(nombreFichero, nombre);
     strcat(nombreFichero, ".pos");
 
-  //  offset = world_rank*sizeof(char)*(N_PERSONAS_P); //ESTA MAL, TIENE QUE SER CON LAS CADENAS
-    MPI_Type_contiguous(N_PERSONAS_P, MPI_INT, &arraytype);
-    MPI_Type_commit(&arraytype);
-
+    sprintf(buf,"ID: %d; Posicion(X: %d, Y: %d); Estado: %d\n",N_PERSONAS,MAX_X,MAX_Y,0);
+    offset = world_rank*strlen(buf)*(N_PERSONAS_P+resto);
     MPI_File_open(MPI_COMM_WORLD, nombreFichero,MPI_MODE_CREATE | MPI_MODE_RDWR, MPI_INFO_NULL, &fh);
-//    MPI_File_set_view(fh, offset,MPI_CHAR, arraytype,"native", MPI_INFO_NULL);
-//    MPI_File_seek( fh, offset, MPI_SEEK_SET );
+    MPI_File_seek( fh, offset, MPI_SEEK_CUR );
 
     tipoNodoRef nodo_aux = *sanos;
     struct Persona* persona;;
     while(nodo_aux != NULL) {
         persona = (struct Persona*) &nodo_aux->info;
         sprintf(buffer,"ID: %d; Posicion(X: %d, Y: %d); Estado: %d\n", persona->id,persona->pos.x, persona->pos.y,persona->estado);
-        buf[i] = buffer;
-        i++;
+        MPI_File_write(fh,buffer,strlen(buffer),MPI_CHAR, MPI_STATUS_IGNORE);
         nodo_aux = nodo_aux->sig;
     }
 
@@ -42,16 +36,13 @@ void GuardarPosiciones(char* nombre,int world_rank,int resto) {
     while(nodo_aux != NULL) {
         persona = (struct Persona*) &nodo_aux->info;
         sprintf(buffer,"ID: %d; Posicion(X: %d, Y: %d); Estado: %d\n", persona->id,persona->pos.x, persona->pos.y,persona->estado);
-        buf[i] = buffer;
-        i++;
+        MPI_File_write(fh, buffer,strlen(buffer),MPI_CHAR, MPI_STATUS_IGNORE);
         nodo_aux = nodo_aux->sig;
     }
 
-    offset = world_rank*sizeof(char)*N_PERSONAS_P;
-    MPI_File_set_view(fh, offset,MPI_CHAR, MPI_CHAR,"native", MPI_INFO_NULL);
-    MPI_File_write(fh, buf,N_PERSONAS_P,MPI_CHAR, MPI_STATUS_IGNORE);
-
     MPI_File_close(&fh);
+    free(buffer);
+    free(buf);
     free(nombreFichero);
 
     /*

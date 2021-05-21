@@ -67,7 +67,7 @@ int main(int argc, char** argv) {
         EstadosPersonas(contagiados,sanos);
         VacunarPersonas(sanos);
         //Propagación
-//	AplicarPropagacion(world_size, world_rank);
+	AplicarPropagacion(world_size, world_rank);
         //Movimiento
         AplicarMovimiento(sanos);
         AplicarMovimiento(contagiados);
