@@ -64,24 +64,20 @@ int main(int argc, char** argv) {
     for(tiempo=0; tiempo<TIEMPO_SIMULACION; tiempo++) {
 //        TIME = tiempo;
         //Actualizar Estados
-//        EstadosPersonas(contagiados,sanos);
-//        VacunarPersonas(sanos);
+        EstadosPersonas(contagiados,sanos);
+        VacunarPersonas(sanos);
         //Propagación
-	AplicarPropagacion(world_size, world_rank);
+//	AplicarPropagacion(world_size, world_rank);
         //Movimiento
-//        AplicarMovimiento(sanos);
-//        AplicarMovimiento(contagiados);
+        AplicarMovimiento(sanos);
+        AplicarMovimiento(contagiados);
 
         if(TIEMPO_BATCH == 0 || (tiempo % TIEMPO_BATCH) == 0) {
             if (tiempo == (TIEMPO_SIMULACION - 1)){
                 flag = 1;
                 MPI_Barrier(MPI_COMM_WORLD);
             }
-<<<<<<< HEAD
             GuardarDatos(n_metrica,flag,resto,world_rank,world_size);
-=======
-//            GuardarDatos(n_metrica,flag,world_rank,world_size);
->>>>>>> 5f5d9213b210ee70aebf0bf656933227a7355549
             n_metrica++;
         }
     }
