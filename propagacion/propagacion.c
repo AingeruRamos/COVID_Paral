@@ -1,5 +1,6 @@
 #include "propagacion.h"
 
+#include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -7,6 +8,8 @@
 #include "../globales.h"
 #include "../persona.h"
 #include "../listaEnlazadaSimple.h"
+
+#define MAX_TAM_PQT 4
 
 float DistanciaEntrePersonas(struct Persona* p1, struct Persona* p2) {
     int dx;
@@ -32,7 +35,25 @@ int HayContagio(struct Persona* p1, struct Persona* p2) {
     return 0;
 }
 
-void AplicarPropagacion() {
+int CrearPaquete(int* pqt, tipoNodoRef pqt_ini) {
+    int tam_pqt = 0;
+    tipoNodoRef pqt_fin = pqt_ini;
+
+    int i=0;
+    while(pqt_fin != NULL && tam_pqt < 4) {
+	pqt[i*tam_pqt] = pqt_fin->info.pos.x;
+	pqt[(i*tam_pqt)+1] = pqt_fin->info.pos.y;
+	tam_pqt++;
+	pqt_fin = pqt_fin->sig;
+    }
+
+    tam_pqt++;
+    return tam_pqt;
+}
+
+void AplicarPropagacion(int world_size, int world_rank) {
+
+    //PARTE INTERNA DEL NODO
     tipoNodoRef nodo_sanos = *sanos;
     tipoNodoRef nodo_contagiados = *contagiados;
     tipoNodoRef nodo_aux;
@@ -59,6 +80,9 @@ void AplicarPropagacion() {
 
                 eliminarNodo(sanos, nodo_sanos);
 		insertarNodoComienzo(contagios_nuevos, persona_copia);
+		N_SANOS--;
+		N_CONTAGIADOS++;
+		R0++;
             }
             nodo_contagiados = nodo_contagiados->sig;
         }
@@ -70,43 +94,89 @@ void AplicarPropagacion() {
 	}
     }
 
-    /*
-	CREAR STRUCT MENSAJE (CHAR TIPO, INT NUMERO_PERSONAS, STRUCT POSICION* P)
-	TIPO = 0 -> MENSAJE POSICION
-	TIPO = 1 -> MENSAJE END
-    */
 
-    /*
-	POR CADA NODO
-	|	SE ELIGE NODO QUE ENVIA
-	|	SI ERES NODO QUE ENVIA
-	|	|	SELECCIONAS PAQUETE DE SANOS
-	|	|	MIENTRAS QUEDEN SANOS
-	|	|	|	BROADCAST MENSAJE POSICION DE UNA LISTA DE SANOS
-	|	|	|	ESPERAS LA RESPUESTA POR GATHER O POR REDUCE_MAX
-	|	|	|	SI RESPUESTA IGUAL 1 -> CONTAGIO
-	|	|	|	SI RESPUESTA IGUAL 0 -> SANO
-	|	|	|	SELECCIONAR SIGUIENTE PAQUETE DE SANOS
-	|	|	-----------------------------------
-	|	|	BROADCAST MENSAJE END
-	|	-------------------------------------------
-	|	SI ERES NODO QUE RECIVE
-	|	|	CREAR FLAG = 0
-	|	|	MIENTRAS FLAG IGUAL 0
-	|	|	|	ESPERAR BROADCAST MENSAJE
-	|	|	|	SI TIPO MENSAJE IGUAL POSICION
-	|	|	|	|	RESERVAS ARRAY PARA RESULTADOS
-	|	|	|	|	RECORRES LOS CONTAGIADOS EN BUSCA DE COINCIDENCIAS
-	|	|	|	|	SI SE CONTAGIA -> PONER LA POSICION DEL ARRAY CORRESPONDIENTE A 1
-	|	|	|	|	SI NO SE CONTAGIA -> PONER LAS POSICION DEL ARRAY CORRESPONDIENTE A 0
-	|	|	|	|	¿ENVIAR EL ARRAY POR GATHER O CADA POSICION POR REDUCE_MAX?
-	|	|	|	--------------------------
-	|	|	|	SI TIPO MENSAJE IGUAL END -> FLAG = 1
-	|	|	-----------------------------------
-	|	-------------------------------------------
-	---------------------------------------------------
-	ACTUALIZAR PUNTERO DE LA LISTA DE CONTAGIADOS
-    */
+    //PARTE CON COMUNICACION
+    nodo_sanos = *sanos;
+
+    int i, j, k;
+
+    int tam_pqt;
+    int pos_array[2*MAX_TAM_PQT];
+
+    int i_indice;
+    int indice_array[MAX_TAM_PQT];
+
+    int tam_res;
+
+    Persona p_aux;
+
+    for(i=0; i<world_size; i++) {
+	if(world_rank == i) { //Nodo director
+ 	    nodo_sanos = *sanos;
+	    while(nodo_sanos != NULL) {
+		tam_pqt = CrearPaquete(pos_array, nodo_sanos);
+	        MPI_Bcast(&tam_pqt, 1, MPI_INT, i, MPI_COMM_WORLD);//Enviar el tamaño del paquete por Bcast
+	        if(tam_pqt > 0) {
+		    //Enviar pos_array por Bcast
+		    MPI_Bcast(pos_array, 2*tam_pqt, MPI_INT, i, MPI_COMM_WORLD);
+	            for(j=0; j<world_size; j++) {
+		        if(j != i) {
+			    //Recibir tamaño de la respuesta
+			    MPI_Recv(&tam_res, 1, MPI_INT, j, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			    //Cargar la informacon recibida en un array buffer
+			    MPI_Recv(&indice_array, tam_res, MPI_INT, j, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			    i_indice = 0;
+			    for(k=0; k<tam_pqt; k++) { //Ver contagios en el paquete y gestionar
+				persona_sana = &nodo_sanos->info;
+				if(indice_array[i_indice] == k) {
+				    nodo_aux = nodo_sanos->sig;
+
+				    persona_copia = CopiarPersona(persona_sana);
+				    persona_copia->estado = 1;
+
+				    eliminarNodo(sanos, nodo_sanos);
+				    insertarNodoComienzo(contagios_nuevos, persona_copia);
+
+				    nodo_sanos = nodo_aux;
+				    i_indice++;
+
+				    N_SANOS--;
+				    N_CONTAGIADOS++;
+				} else {
+				    nodo_sanos = nodo_sanos->sig;
+			    	}
+			    }
+			}
+		    }
+	        }
+	    }
+	} else { //Nodos esclavos
+	    //Recibir el tamaño del paquete por Bcast
+	    MPI_Bcast(&tam_pqt, 1, MPI_INT, i, MPI_COMM_WORLD);
+	    while(tam_pqt > 0) {
+	    	//Cargar la informacion recbida en un array buffer
+		MPI_Bcast(pos_array, 2*tam_pqt, MPI_INT, i, MPI_COMM_WORLD);
+		i_indice = 0;
+		for(j=0; j<2*tam_pqt; j+=2) { //Calcular contagios en el paquete
+		    p_aux.pos.x = pos_array[j];
+		    p_aux.pos.y = pos_array[j+1];
+		    nodo_contagiados = *contagiados;
+		    while(nodo_contagiados != NULL) {
+			persona_contagiada = &nodo_contagiados->info;
+		        if(HayContagio(&p_aux, persona_contagiada)) {
+			    indice_array[i_indice] = j/2;
+			    i_indice++;
+			    R0++;
+			    break;
+			}
+			nodo_contagiados = nodo_contagiados->sig;
+                    }
+		}
+		MPI_Send(&i_indice, 1, MPI_INT, i, 0, MPI_COMM_WORLD); //Enviar numero de contag
+	    	MPI_Send(indice_array, i_indice, MPI_INT, i, 0, MPI_COMM_WORLD); //Enviar los indices de los contagiados
+	    }
+	}
+    }
 
     contagiados = contagios_nuevos;
 }
