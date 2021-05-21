@@ -16,7 +16,7 @@
 #include "metricas/metricas.h"
 
 void InicializarParametros(char** argv);
-void InicializarGlobales(gsl_rng *r, int world_rank, int world_size);
+void InicializarGlobales(gsl_rng *r, int world_rank, int world_size,int resto);
 void calcular_edad(ListaEnlazadaRef lista,int n,gsl_rng *r,int world_rank);
 
 int main(int argc, char** argv) {
@@ -58,7 +58,7 @@ int main(int argc, char** argv) {
             N_PERSONAS_P++;
     }
 
-    InicializarGlobales(r, world_rank, world_size);
+    InicializarGlobales(r, world_rank, world_size,resto);
     gsl_rng_free(r);
 
     for(tiempo=0; tiempo<TIEMPO_SIMULACION; tiempo++) {
@@ -77,7 +77,15 @@ int main(int argc, char** argv) {
                 flag = 1;
                 MPI_Barrier(MPI_COMM_WORLD);
             }
+<<<<<<< HEAD
             GuardarDatos(n_metrica,flag,world_rank,world_size);
+=======
+<<<<<<< HEAD
+            GuardarDatos(n_metrica,flag,resto,world_rank,world_size);
+=======
+//            GuardarDatos(n_metrica,flag,world_rank,world_size);
+>>>>>>> 5f5d9213b210ee70aebf0bf656933227a7355549
+>>>>>>> 4ed35d5aa838db47d9141ade310d8537decb7c0d
             n_metrica++;
         }
     }
@@ -118,7 +126,7 @@ void InicializarParametros(char** argv) {
 
 }
 
-void InicializarGlobales(gsl_rng *r,int world_rank,int world_size) {
+void InicializarGlobales(gsl_rng *r,int world_rank,int world_size,int resto) {
     float porcent_vacunacion;
     int i;
     struct Persona* nueva_persona;
@@ -143,6 +151,8 @@ void InicializarGlobales(gsl_rng *r,int world_rank,int world_size) {
         N_CONTAGIADOS = 0;
     }
 
+    //printf("%d personas sanas de %d personas del nodo %d\n",N_SANOS,N_PERSONAS_P, world_rank);
+    //printf("%d personas contagiadas de %d personas del nodo %d\n",N_CONTAGIADOS,N_PERSONAS_P,world_rank);
     if (world_rank == 0){
         porcent_vacunacion = (float) PORCENT_VACUNACION / 100;
         N_PERSONAS_VACU = (int) (N_PERSONAS * porcent_vacunacion);
@@ -157,17 +167,33 @@ void InicializarGlobales(gsl_rng *r,int world_rank,int world_size) {
 
     crearVacia(sanos);
 
+
     //INICIALIZAMOS LAS LISTAS
     for(i=0; i<N_SANOS; i++) {
-       nueva_persona = NuevaPersona(world_rank * N_PERSONAS_P + i, 0);
-       insertarNodoFinal(sanos, nueva_persona);
+       if(resto > world_rank || resto == 0){
+           nueva_persona = NuevaPersona(world_rank * N_PERSONAS_P+i, 0);
+           insertarNodoFinal(sanos, nueva_persona);
+       }
+       else{
+           nueva_persona = NuevaPersona(world_rank * N_PERSONAS_P+i+resto, 0);
+           insertarNodoFinal(sanos, nueva_persona);
+       }
     }
 
     crearVacia(contagiados);
 
+    MPI_Barrier(MPI_COMM_WORLD);
     if (world_rank == NODO_CONTAGIADO){
-       nueva_persona = NuevaPersona( world_rank * N_PERSONAS_P + N_SANOS, 2);
-       insertarNodoFinal(contagiados, nueva_persona);
+       if (resto <= NODO_CONTAGIADO && resto != 0){
+           printf("El nodo contagiado es %d\n",NODO_CONTAGIADO);
+           nueva_persona = NuevaPersona( world_rank * N_PERSONAS_P + N_SANOS+resto, 2);
+           insertarNodoFinal(contagiados, nueva_persona);
+       }
+       else{
+           printf("El nodo contagiado es %d\n",NODO_CONTAGIADO);
+           nueva_persona = NuevaPersona( world_rank * N_PERSONAS_P + N_SANOS, 2);
+           insertarNodoFinal(contagiados, nueva_persona);
+       }
     }
 
     calcular_edad(sanos,N_SANOS,r,world_rank);
@@ -189,20 +215,24 @@ void InicializarGlobales(gsl_rng *r,int world_rank,int world_size) {
 void calcular_edad(ListaEnlazadaRef lista,int n,gsl_rng *r, int world_rank){
     int edad,i;
     float mu;
+    int cont=0;
     tipoNodoRef nodo = *lista;
     Persona *persona;
 
     mu=100;
     //media edad = alfa / (alfa + beta)
 
-    for (i=0 ; i< n; i++){
-        persona = (Persona*) &nodo->info;
+ //   for (i=0 ; i< n; i++){
+    while(nodo != NULL){
+       persona = (Persona*) &nodo->info;
         edad = round(mu * gsl_ran_beta(r, ALFA, BETA));
         persona->edad = edad;
         persona->p_muerte = calcular_p_morir(edad);
-     //   printf("Persona %d del nodo %d \n",persona->id, world_rank);
+        printf("Persona %d del nodo %d \n",persona->id, world_rank);
         nodo = nodo->sig;
+        cont++;
     }
 
+   // printf("El contador es %d del world_rank %d\n", cont, world_rank);
 }
 
