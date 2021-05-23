@@ -11,45 +11,55 @@
 void GuardarPosiciones(char* nombre,int world_rank,int resto) {
     MPI_File fh;
     MPI_Offset offset;
+    MPI_Datatype arraytype;
     char *nombreFichero = (char*) malloc(sizeof(char)*200);
-    char *buf = (char*) calloc(sizeof(char),200);
-    int length;
+    char *buffer = (char*) malloc(sizeof(char)*200);
+    char *buf = (char*) malloc(sizeof(char)*200);
+    int temp;
 
     strcpy(nombreFichero, nombre);
     strcat(nombreFichero, ".pos");
 
     sprintf(buf,"ID: %d; Posicion(X: %d, Y: %d); Estado: %d\n",N_PERSONAS,MAX_X,MAX_Y,0);
     if (world_rank == 0){
-      length = strlen(buf);
-      length = length*N_PERSONAS_P;
+       temp = N_PERSONAS_P*strlen(buf);
     }
-    MPI_Bcast(&length,1,MPI_INT,0,MPI_COMM_WORLD);
-    offset = world_rank*length;
+    MPI_Bcast(&temp,1,MPI_INT, 0, MPI_COMM_WORLD);
+    offset = world_rank*temp;
 
     MPI_File_open(MPI_COMM_WORLD, nombreFichero,MPI_MODE_CREATE | MPI_MODE_RDWR, MPI_INFO_NULL, &fh);
-    MPI_File_seek(fh,offset,MPI_SEEK_CUR);
+    MPI_File_set_view( fh, offset,MPI_CHAR,MPI_CHAR,"native", MPI_INFO_NULL );
 
-    MPI_File_write(fh,"\n",strlen("\n"),MPI_CHAR, MPI_STATUS_IGNORE);
+    if(world_rank == 0){
     tipoNodoRef nodo_aux = *sanos;
-    struct Persona* persona;
+    struct Persona* persona;;
     while(nodo_aux != NULL) {
         persona = (struct Persona*) &nodo_aux->info;
-        sprintf(buf,"ID: %d; Posicion(X: %d, Y: %d); Estado: %d\n", persona->id,persona->pos.x, persona->pos.y,persona->estado);
-        MPI_File_write(fh,buf,strlen(buf),MPI_CHAR, MPI_STATUS_IGNORE);
+        sprintf(buffer,"ID: %d; Posicion(X: %d, Y: %d); Estado: %d\n", persona->id,persona->pos.x, persona->pos.y,persona->estado);
+        MPI_File_write(fh,buffer,strlen(buffer),MPI_CHAR, MPI_STATUS_IGNORE);
         nodo_aux = nodo_aux->sig;
     }
 
     nodo_aux = *contagiados;
     while(nodo_aux != NULL) {
         persona = (struct Persona*) &nodo_aux->info;
-        sprintf(buf,"ID: %d; Posicion(X: %d, Y: %d); Estado: %d\n", persona->id,persona->pos.x, persona->pos.y,persona->estado);
-        MPI_File_write(fh,buf,strlen(buf),MPI_CHAR, MPI_STATUS_IGNORE);
+        sprintf(buffer,"ID: %d; Posicion(X: %d, Y: %d); Estado: %d\n", persona->id,persona->pos.x, persona->pos.y,persona->estado);
+        MPI_File_write(fh, buffer,strlen(buffer),MPI_CHAR, MPI_STATUS_IGNORE);
         nodo_aux = nodo_aux->sig;
     }
-
+}
     MPI_File_close(&fh);
+    free(buffer);
     free(buf);
     free(nombreFichero);
+
+    /*
+	CREAR Y ABRIR FICHERO DE FORMA PARALELA
+	EXPANDIR EL TAMAÑO DEL FICHERO CON UN SEEK PARA ALBERGAR TODOS LOS DATOS
+	CALCULAR OFFSET DE CADA NODO. EL TAMAÑO DE CADA REGION ES PARA PONER TODAS LSA PERSONAS DEL NODO. NO SE DIVIDE ENTRE SANOS Y CONTAGIADOS (TORTURA)
+	ESCRIBIR EN SUS ZONAS SUS RESPECTIVAS PERSONAS
+	LIBERAR LOS PUNTEROS DE FICHEROS Y TODA LA MOVIDA
+    */
 }
 
 void GuardarMetricas(char* nombre) {
@@ -78,6 +88,17 @@ void GuardarMetricas(char* nombre) {
 
     fclose(fp);
     free(nombreFichero);
+
+    /*
+	SI ERES EL NODO 0
+		ESPERAS LAS RESPUESTAS DEL RESTO POR REDUCE_SUM DE CADA METRICA
+		DIVIDES LAS METRICAS POR EL TIEMPO DE BATCH
+		CREAS Y ABRES EL FICHERO DE FORMA SERIAL
+		ESCRIBES LOS DATOS
+		LIBERAS EL PUNTERO Y TODA LA MIERDA
+	SI NO ERES EL NODO 0
+		ENVIAS POR REDUCE_SUM LAS METRICAS
+    */
 }
 
 void GuardarDatos(int id_metricas, int flag,int resto,int world_rank, int world_size) {
@@ -124,4 +145,14 @@ void GuardarDatos(int id_metricas, int flag,int resto,int world_rank, int world_
     }
 
     free(ruta);
+
+    /*
+	CALCULAR LA RUTA DE LA CARPETA DE LA SIMULACION
+	SI ERES EL NODO 0
+		CREA LA CARPETA DE LA SIMULACION
+
+	CALCULAS EL NOMBRE DEL FICHERO
+	EJECUTAS LAS FUNCIONES
+	LIBERAS LA RUTA
+    */
 }

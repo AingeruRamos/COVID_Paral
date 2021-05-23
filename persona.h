@@ -16,7 +16,7 @@ typedef struct Persona {
     int edad;
     int estado;
     int cont_incu; //contador para el tiempo de incubacion
-    int  cont_recu; //contador para el tiepo de recuperacion
+    int  cont_recu; //contador para el tiempo de recuperacion
     float p_muerte; //Probabilidad de muerte
     struct Posicion pos;
     struct Velocidad vel;

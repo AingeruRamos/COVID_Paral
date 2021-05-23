@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
     gsl_rng_free(r);
 
     for(tiempo=0; tiempo<TIEMPO_SIMULACION; tiempo++) {
-//        TIME = tiempo;
+
         //Actualizar Estados
         EstadosPersonas(contagiados,sanos);
         VacunarPersonas(sanos);
@@ -143,8 +143,6 @@ void InicializarGlobales(gsl_rng *r,int world_rank,int world_size,int resto) {
         N_CONTAGIADOS = 0;
     }
 
-    //printf("%d personas sanas de %d personas del nodo %d\n",N_SANOS,N_PERSONAS_P, world_rank);
-    //printf("%d personas contagiadas de %d personas del nodo %d\n",N_CONTAGIADOS,N_PERSONAS_P,world_rank);
     if (world_rank == 0){
         porcent_vacunacion = (float) PORCENT_VACUNACION / 100;
         N_PERSONAS_VACU = (int) (N_PERSONAS * porcent_vacunacion);
@@ -177,12 +175,10 @@ void InicializarGlobales(gsl_rng *r,int world_rank,int world_size,int resto) {
     MPI_Barrier(MPI_COMM_WORLD);
     if (world_rank == NODO_CONTAGIADO){
        if (resto <= NODO_CONTAGIADO && resto != 0){
-           printf("El nodo contagiado es %d\n",NODO_CONTAGIADO);
            nueva_persona = NuevaPersona( world_rank * N_PERSONAS_P + N_SANOS+resto, 2);
            insertarNodoFinal(contagiados, nueva_persona);
        }
        else{
-           printf("El nodo contagiado es %d\n",NODO_CONTAGIADO);
            nueva_persona = NuevaPersona( world_rank * N_PERSONAS_P + N_SANOS, 2);
            insertarNodoFinal(contagiados, nueva_persona);
        }
@@ -214,17 +210,13 @@ void calcular_edad(ListaEnlazadaRef lista,int n,gsl_rng *r, int world_rank){
     mu=100;
     //media edad = alfa / (alfa + beta)
 
- //   for (i=0 ; i< n; i++){
     while(nodo != NULL){
        persona = (Persona*) &nodo->info;
         edad = round(mu * gsl_ran_beta(r, ALFA, BETA));
         persona->edad = edad;
         persona->p_muerte = calcular_p_morir(edad);
-        printf("Persona %d del nodo %d \n",persona->id, world_rank);
         nodo = nodo->sig;
         cont++;
     }
-
-   // printf("El contador es %d del world_rank %d\n", cont, world_rank);
 }
 
